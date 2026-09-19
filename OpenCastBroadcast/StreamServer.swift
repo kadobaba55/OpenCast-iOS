@@ -20,7 +20,9 @@ public class StreamServer {
         guard !isRunning else { return }
         self.port = port
 
-        let params = NWParameters.tcp
+        let tcpOptions = NWProtocolTCP.Options()
+        tcpOptions.enableKeepalive = true
+        let params = NWParameters(tls: nil, tcp: tcpOptions)
         params.allowLocalEndpointReuse = true
 
         do {
@@ -101,7 +103,6 @@ public class StreamServer {
         let path = parts[1]
 
         if path == "/stream" || path.starts(with: "/stream?") {
-            // MJPEG Canlı Akış Bağlantısı (Tüm Smart TV tarayıcıları destekler)
             let header = "HTTP/1.1 200 OK\r\n" +
                          "Connection: close\r\n" +
                          "Server: OpenCast-Universal\r\n" +
@@ -120,7 +121,6 @@ public class StreamServer {
                 })
             }
         } else {
-            // Ana Sayfa HTML Oynatıcıyı Sun (WebViewer.html)
             serveWebPlayer(on: connection)
         }
     }
@@ -159,7 +159,6 @@ public class StreamServer {
             var packet = boundaryData
             packet.append(jpegData)
 
-            // Yavaş istemcilerin belleği şişirmemesi için gönderim sırasında hata verenleri temizle
             self.streamConnections.removeAll { conn in
                 if conn.state != .ready { return true }
                 conn.send(content: packet, completion: .contentProcessed { error in

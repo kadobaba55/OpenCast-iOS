@@ -323,6 +323,7 @@ struct ContentView: View {
         if let newIP = NetworkUtils.getWiFiAddress() {
             ipAddress = newIP
         }
+        StreamServer.shared.start(onPort: 8080)
         discovery.startScanning()
     }
 

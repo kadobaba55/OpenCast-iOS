@@ -22,6 +22,8 @@ targets:
     platform: iOS
     sources:
       - path: OpenCast
+      - path: OpenCastBroadcast/StreamServer.swift
+      - path: OpenCastBroadcast/WebViewerTemplate.swift
     info:
       path: OpenCast/Info.plist
       properties:
@@ -54,6 +56,7 @@ targets:
         CFBundleIdentifier: "com.opencast.app.broadcast"
         CFBundleShortVersionString: "1.0.0"
         CFBundleVersion: "1"
+        NSLocalNetworkUsageDescription: "OpenCast ekranınızı yerel ağa aktarmak için yerel ağ iznine ihtiyaç duyar."
         NSExtension:
           NSExtensionPointIdentifier: "com.apple.broadcast-services-upload"
           NSExtensionPrincipalClass: "$(PRODUCT_MODULE_NAME).SampleHandler"
