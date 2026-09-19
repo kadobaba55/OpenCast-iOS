@@ -1,0 +1,54 @@
+name: Build OpenCast iOS (.ipa)
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch: # Manuel olarak GitHub sitesinden tek tıkla başlatma butonu
+
+jobs:
+  build:
+    name: XcodeGen & iOS .ipa Derlemesi
+    runs-on: macos-latest
+
+    steps:
+      - name: Kodları Çek (Checkout)
+        uses: actions/checkout@v4
+
+      - name: Xcode Sürümünü Seç
+        run: |
+          sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+          xcodebuild -version
+
+      - name: XcodeGen Kur
+        run: brew install xcodegen
+
+      - name: Xcode Projesini Otomatik Üret
+        run: xcodegen generate
+
+      - name: OpenCast Uygulamasını Derle (Release)
+        run: |
+          xcodebuild -project OpenCast.xcodeproj \
+            -scheme OpenCast \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CONFIGURATION_BUILD_DIR=build/Release-iphoneos \
+            clean build
+
+      - name: .ipa Paketini Oluştur
+        run: |
+          mkdir -p Payload
+          cp -r build/Release-iphoneos/OpenCast.app Payload/
+          zip -r OpenCast.ipa Payload
+          echo "OpenCast.ipa başarıyla oluşturuldu!"
+
+      - name: .ipa Dosyasını İndirilebilir Olarak Yükle (Artifact)
+        uses: actions/upload-artifact@v4
+        with:
+          name: OpenCast-iOS-ipa
+          path: OpenCast.ipa
+          retention-days: 14
