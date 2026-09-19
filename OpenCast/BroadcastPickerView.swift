@@ -1,18 +1,18 @@
 import SwiftUI
 import ReplayKit
 
-/// Apple'ın RPSystemBroadcastPickerView bileşenini SwiftUI içinde kullanılabilir hale getirir.
-/// Bu sayede kullanıcı Denetim Merkezi'ni aramadan tek tıkla doğrudan uygulama içinden yayını başlatabilir.
+/// Apple'ın RPSystemBroadcastPickerView bileşenini tam tıklanabilir ve görünür şekilde SwiftUI'a aktarır.
 struct BroadcastPickerView: UIViewRepresentable {
     func makeUIView(context: Context) -> RPSystemBroadcastPickerView {
-        let picker = RPSystemBroadcastPickerView(frame: CGRect(x: 0, y: 0, width: 64, height: 64))
+        let picker = RPSystemBroadcastPickerView(frame: CGRect(x: 0, y: 0, width: 60, height: 60))
         picker.preferredExtension = "com.opencast.app.broadcast"
         picker.showsMicrophoneButton = false
         
-        // Buton içindeki simgeyi belirgin ve şık yapmak için
+        // Simge rengini beyaz yap
         for subview in picker.subviews {
             if let button = subview as? UIButton {
-                button.tintColor = .systemBlue
+                button.tintColor = .white
+                button.imageView?.tintColor = .white
             }
         }
         

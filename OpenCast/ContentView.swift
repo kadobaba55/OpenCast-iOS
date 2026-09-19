@@ -83,28 +83,35 @@ struct ContentView: View {
 
     private var broadcastStarterCard: some View {
         VStack(spacing: 8) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(LinearGradient(colors: [Color.blue, Color(red: 0.15, green: 0.45, blue: 0.95)], startPoint: .leading, endPoint: .trailing))
-                    .frame(height: 54)
-                    .shadow(color: Color.blue.opacity(0.3), radius: 8, y: 4)
-
-                HStack(spacing: 10) {
-                    Image(systemName: "record.circle")
-                        .font(.system(size: 22, weight: .bold))
-                    Text("1. Önce Yayını Açın")
-                        .font(.system(size: 16, weight: .bold))
-                }
-                .foregroundColor(.white)
-
+            HStack(spacing: 16) {
+                // Apple'ın resmi ve doğrudan tıklanabilir yayın başlatıcı butonu
                 BroadcastPickerView()
-                    .frame(maxWidth: .infinity, maxHeight: 54)
-                    .opacity(0.015)
-            }
+                    .frame(width: 54, height: 54)
+                    .background(Circle().fill(Color.blue))
+                    .shadow(color: Color.blue.opacity(0.4), radius: 6, y: 3)
 
-            Text("Yayını başlattıktan sonra TV'nizin yanındaki 'Yansıt'a basın")
-                .font(.system(size: 11, weight: .medium))
-                .foregroundColor(.gray)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("1. Ekran Yayınını Başlat")
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundColor(.white)
+                    Text("Soldaki butona dokunun ve 'Yayını Başlat'ı seçin")
+                        .font(.system(size: 12))
+                        .foregroundColor(.gray)
+                }
+
+                Spacer()
+            }
+            .padding(14)
+            .background(RoundedRectangle(cornerRadius: 18).fill(Color(red: 0.12, green: 0.12, blue: 0.16)))
+            .overlay(
+                RoundedRectangle(cornerRadius: 18)
+                    .stroke(Color.blue.opacity(0.3), lineWidth: 1)
+            )
+
+            Text("İpucu: iPhone Denetim Merkezi'nden 'Ekran Kaydı'na basılı tutarak da OpenCast'i seçebilirsiniz.")
+                .font(.system(size: 11))
+                .foregroundColor(.gray.opacity(0.7))
+                .multilineTextAlignment(.center)
         }
     }
 
