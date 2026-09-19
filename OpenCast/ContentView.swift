@@ -1,12 +1,12 @@
 import SwiftUI
-import CoreImage.CIFilterBuiltins
 
 struct ContentView: View {
     @StateObject private var discovery = DLNADiscovery.shared
     @State private var ipAddress: String = NetworkUtils.getWiFiAddress() ?? "Wi-Fi Yok"
     @State private var port: String = "8080"
     @State private var isConnectingDevice: String? = nil
-    @State private var connectionMessage: String? = nil
+    @State private var manualIP: String = ""
+    @State private var showManualSheet: Bool = false
     @State private var showBrowserFallback: Bool = false
 
     private var streamURLString: String {
@@ -20,20 +20,23 @@ struct ContentView: View {
                     .ignoresSafeArea()
 
                 ScrollView {
-                    VStack(spacing: 22) {
+                    VStack(spacing: 20) {
                         // Üst Bar
                         headerView
 
-                        // 1. Canlı Yayın Başlatıcı (ReplayKit Butonu)
+                        // 1. Ekran Yayını Başlatıcı Buton
                         broadcastStarterCard
 
-                        // 2. Ana Bölüm: Ağdaki TV'leri Otomatik Tarama ve Listeleme
+                        // 2. Ağdaki TV'ler Listesi
                         deviceScannerSection
 
-                        // 3. İpuçları (Vestel DLNA Ayarı)
-                        tvSetupTipCard
+                        // 3. Manuel TV IP Ekleme Kartı (Hızlı Çözüm)
+                        manualIPCard
 
-                        // 4. İsteğe Bağlı: Tarayıcı Modu (Açılır/Kapanır)
+                        // 4. Vestel ve Ağ Ayar Kontrol Listesi
+                        troubleshootCard
+
+                        // 5. İsteğe Bağlı: Tarayıcı Modu
                         browserFallbackSection
 
                         Spacer(minLength: 30)
@@ -49,7 +52,7 @@ struct ContentView: View {
         }
     }
 
-    // MARK: - Görünüm Parçaları
+    // MARK: - Bileşenler
 
     private var headerView: some View {
         HStack {
@@ -62,8 +65,8 @@ struct ContentView: View {
                         .font(.system(size: 26, weight: .black, design: .rounded))
                         .foregroundColor(.white)
                 }
-                Text("Otomatik TV Keşfi & Tek Tıkla Yansıtma")
-                    .font(.system(size: 13, weight: .medium))
+                Text("IP: \(ipAddress)")
+                    .font(.system(size: 13, weight: .medium, design: .monospaced))
                     .foregroundColor(.gray)
             }
             Spacer()
@@ -82,25 +85,24 @@ struct ContentView: View {
         VStack(spacing: 8) {
             ZStack {
                 RoundedRectangle(cornerRadius: 16)
-                    .fill(LinearGradient(colors: [Color.blue, Color(red: 0.1, green: 0.4, blue: 0.9)], startPoint: .leading, endPoint: .trailing))
+                    .fill(LinearGradient(colors: [Color.blue, Color(red: 0.15, green: 0.45, blue: 0.95)], startPoint: .leading, endPoint: .trailing))
                     .frame(height: 54)
                     .shadow(color: Color.blue.opacity(0.3), radius: 8, y: 4)
 
                 HStack(spacing: 10) {
                     Image(systemName: "record.circle")
                         .font(.system(size: 22, weight: .bold))
-                    Text("1. Önce Ekran Yayınını Açın")
+                    Text("1. Önce Yayını Açın")
                         .font(.system(size: 16, weight: .bold))
                 }
                 .foregroundColor(.white)
 
-                // ReplayKit Başlatıcı (Görünmez ama tıklanabilir)
                 BroadcastPickerView()
                     .frame(maxWidth: .infinity, maxHeight: 54)
                     .opacity(0.015)
             }
 
-            Text("Ekran yayını açıkken aşağıdaki televizyonunuza tek tıkla bağlanın")
+            Text("Yayını başlattıktan sonra TV'nizin yanındaki 'Yansıt'a basın")
                 .font(.system(size: 11, weight: .medium))
                 .foregroundColor(.gray)
         }
@@ -109,7 +111,7 @@ struct ContentView: View {
     private var deviceScannerSection: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
-                Text("AĞDAKİ TELEVİZYONLAR")
+                Text("BULUNAN TELEVİZYONLAR")
                     .font(.system(size: 12, weight: .bold))
                     .foregroundColor(.blue)
                     .tracking(1)
@@ -126,7 +128,7 @@ struct ContentView: View {
                             .foregroundColor(.gray)
                     }
                 } else {
-                    Button("Tekrar Tara", action: { discovery.startScanning() })
+                    Button("Yeniden Tara", action: { discovery.startScanning() })
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundColor(.blue)
                 }
@@ -147,28 +149,27 @@ struct ContentView: View {
     }
 
     private func deviceCard(for device: DLNADevice) -> some View {
-        let isVestel = device.name.lowercased().contains("vestel")
         let isConnecting = isConnectingDevice == device.id
 
         return HStack(spacing: 14) {
             ZStack {
                 Circle()
-                    .fill(isVestel ? Color.blue.opacity(0.2) : Color.white.opacity(0.08))
+                    .fill(Color.blue.opacity(0.2))
                     .frame(width: 48, height: 48)
 
                 Image(systemName: "tv.fill")
                     .font(.system(size: 22))
-                    .foregroundColor(isVestel ? .blue : .white)
+                    .foregroundColor(.blue)
             }
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(device.name)
-                    .font(.system(size: 16, weight: .bold))
+                    .font(.system(size: 15, weight: .bold))
                     .foregroundColor(.white)
                     .lineLimit(1)
 
                 Text(device.ipAddress)
-                    .font(.system(size: 12))
+                    .font(.system(size: 12, design: .monospaced))
                     .foregroundColor(.gray)
             }
 
@@ -191,63 +192,89 @@ struct ContentView: View {
             .disabled(isConnecting)
         }
         .padding(14)
-        .background(RoundedRectangle(cornerRadius: 14).fill(Color.black.opacity(0.35)))
+        .background(RoundedRectangle(cornerRadius: 14).fill(Color.black.opacity(0.4)))
         .overlay(
             RoundedRectangle(cornerRadius: 14)
-                .stroke(isVestel ? Color.blue.opacity(0.4) : Color.clear, lineWidth: 1)
+                .stroke(Color.blue.opacity(0.3), lineWidth: 1)
         )
     }
 
     private var emptyDevicesView: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 10) {
             Image(systemName: "tv.slash")
-                .font(.system(size: 36))
-                .foregroundColor(.gray.opacity(0.5))
-                .padding(.top, 10)
+                .font(.system(size: 34))
+                .foregroundColor(.gray.opacity(0.4))
+                .padding(.top, 8)
 
-            Text("Ağda Henüz TV Bulunamadı")
-                .font(.system(size: 15, weight: .semibold))
+            Text("Ağda Otomatik TV Bulunamadı")
+                .font(.system(size: 14, weight: .semibold))
                 .foregroundColor(.white)
 
-            Text("Vestel TV'niz ile iPhone'un AYNI Wi-Fi ağına bağlı olduğundan emin olun.")
-                .font(.system(size: 12))
+            Text("Modeminizin Wi-Fi izolasyonu taramayı engelliyor olabilir. Aşağıdan TV IP'nizi yazarak doğrudan bağlanabilirsiniz.")
+                .font(.system(size: 11))
                 .foregroundColor(.gray)
                 .multilineTextAlignment(.center)
-                .padding(.horizontal, 10)
-
-            Button(action: { discovery.startScanning() }) {
-                HStack(spacing: 6) {
-                    Image(systemName: "arrow.clockwise")
-                    Text("Yeniden Ara")
-                }
-                .font(.system(size: 13, weight: .bold))
-                .foregroundColor(.blue)
-                .padding(.vertical, 6)
-            }
+                .padding(.horizontal, 8)
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 20)
+        .padding(.vertical, 14)
     }
 
-    private var tvSetupTipCard: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 6) {
-                Image(systemName: "lightbulb.fill")
-                    .foregroundColor(.yellow)
-                Text("Vestel TV İçin Önemli İpucu")
+    private var manualIPCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Image(systemName: "keyboard")
+                    .foregroundColor(.blue)
+                Text("TV'nin IP Adresiyle Doğrudan Bağlan")
                     .font(.system(size: 13, weight: .bold))
                     .foregroundColor(.white)
             }
 
-            Text("Televizyonun otomatik algılanması için kumandanızdan:\nMenü > Ayarlar > Diğer Ayarlar > DLNA / AVS seçeneğini 'Etkin' yapın.")
-                .font(.system(size: 12))
+            Text("Vestel Kumandası: Menü > Ayarlar > Ağ Ayarları kısmındaki IP'yi yazın:")
+                .font(.system(size: 11))
+                .foregroundColor(.gray)
+
+            HStack {
+                TextField("Örn: 192.168.1.35", text: $manualIP)
+                    .keyboardType(.numbersAndPunctuation)
+                    .padding(10)
+                    .background(RoundedRectangle(cornerRadius: 10).fill(Color.black.opacity(0.5)))
+                    .foregroundColor(.white)
+                    .font(.system(size: 14, design: .monospaced))
+
+                Button(action: addManualIP) {
+                    Text("Ekle & Bağlan")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 10)
+                        .background(RoundedRectangle(cornerRadius: 10).fill(Color.blue))
+                }
+            }
+        }
+        .padding(16)
+        .background(RoundedRectangle(cornerRadius: 16).fill(Color(red: 0.10, green: 0.10, blue: 0.13)))
+    }
+
+    private var troubleshootCard: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 6) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .foregroundColor(.yellow)
+                Text("Cihaz Bulunamazsa Bu 2 Ayarı Kontrol Edin")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundColor(.white)
+            }
+
+            Text("1. iPhone: Ayarlar > OpenCast > 'Yerel Ağ' izni AÇIK olmalı.\n2. Vestel: Menü > Ayarlar > Diğer Ayarlar > DLNA/AVS seçeneği 'Etkin' olmalı.")
+                .font(.system(size: 11))
                 .foregroundColor(.gray)
                 .lineSpacing(2)
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(RoundedRectangle(cornerRadius: 14).fill(Color.yellow.opacity(0.06)))
-        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.yellow.opacity(0.2), lineWidth: 1))
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.yellow.opacity(0.18), lineWidth: 1))
     }
 
     private var browserFallbackSection: some View {
@@ -255,30 +282,30 @@ struct ContentView: View {
             Button(action: { withAnimation { showBrowserFallback.toggle() } }) {
                 HStack {
                     Image(systemName: "safari")
-                    Text("Alternatif: TV Tarayıcısı ile Bağlan")
+                    Text("Yedek Yöntem: TV Tarayıcısı")
                     Spacer()
                     Image(systemName: showBrowserFallback ? "chevron.up" : "chevron.down")
                 }
-                .font(.system(size: 13, weight: .medium))
+                .font(.system(size: 12, weight: .medium))
                 .foregroundColor(.gray)
                 .padding(12)
                 .background(RoundedRectangle(cornerRadius: 12).fill(Color.white.opacity(0.04)))
             }
 
             if showBrowserFallback {
-                VStack(spacing: 10) {
+                VStack(spacing: 8) {
                     Text("TV Tarayıcısına şu adresi yazabilirsiniz:")
-                        .font(.system(size: 12))
+                        .font(.system(size: 11))
                         .foregroundColor(.gray)
 
                     Text("http://\(ipAddress):\(port)")
-                        .font(.system(size: 16, weight: .bold, design: .monospaced))
+                        .font(.system(size: 15, weight: .bold, design: .monospaced))
                         .foregroundColor(.white)
-                        .padding(10)
-                        .background(RoundedRectangle(cornerRadius: 10).fill(Color.black.opacity(0.5)))
+                        .padding(8)
+                        .background(RoundedRectangle(cornerRadius: 8).fill(Color.black.opacity(0.5)))
                 }
-                .padding(14)
-                .background(RoundedRectangle(cornerRadius: 14).fill(Color(red: 0.09, green: 0.09, blue: 0.11)))
+                .padding(12)
+                .background(RoundedRectangle(cornerRadius: 12).fill(Color(red: 0.09, green: 0.09, blue: 0.11)))
             }
         }
     }
@@ -290,6 +317,13 @@ struct ContentView: View {
             ipAddress = newIP
         }
         discovery.startScanning()
+    }
+
+    private func addManualIP() {
+        let clean = manualIP.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !clean.isEmpty else { return }
+        discovery.addManualDevice(ip: clean)
+        manualIP = ""
     }
 
     private func castTo(_ device: DLNADevice) {
