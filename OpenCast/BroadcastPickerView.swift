@@ -6,7 +6,7 @@ import ReplayKit
 struct BroadcastPickerView: UIViewRepresentable {
     func makeUIView(context: Context) -> RPSystemBroadcastPickerView {
         let picker = RPSystemBroadcastPickerView(frame: CGRect(x: 0, y: 0, width: 64, height: 64))
-        picker.preferredExtension = "com.opencast.OpenCastBroadcast"
+        picker.preferredExtension = "com.opencast.app.broadcast"
         picker.showsMicrophoneButton = false
         
         // Buton içindeki simgeyi belirgin ve şık yapmak için

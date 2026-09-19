@@ -41,9 +41,10 @@ jobs:
 
       - name: .ipa Paketini Oluştur
         run: |
+          chmod -R 755 build/Release-iphoneos/OpenCast.app
           mkdir -p Payload
-          cp -r build/Release-iphoneos/OpenCast.app Payload/
-          zip -r OpenCast.ipa Payload
+          cp -R build/Release-iphoneos/OpenCast.app Payload/
+          zip -r -y -X OpenCast.ipa Payload
           echo "OpenCast.ipa başarıyla oluşturuldu!"
 
       - name: .ipa Dosyasını İndirilebilir Olarak Yükle (Artifact)

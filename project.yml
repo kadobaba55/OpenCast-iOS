@@ -26,9 +26,10 @@ targets:
       path: OpenCast/Info.plist
       properties:
         CFBundleDisplayName: "OpenCast"
+        CFBundleIdentifier: "com.opencast.app"
         CFBundleShortVersionString: "1.0.0"
         CFBundleVersion: "1"
-        UILaunchStoryboardName: "LaunchScreen"
+        UILaunchScreen: {}
         UIRequiresFullScreen: true
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
@@ -50,6 +51,7 @@ targets:
       path: OpenCastBroadcast/Info.plist
       properties:
         CFBundleDisplayName: "OpenCast Ekran Yayını"
+        CFBundleIdentifier: "com.opencast.app.broadcast"
         CFBundleShortVersionString: "1.0.0"
         CFBundleVersion: "1"
         NSExtension:
