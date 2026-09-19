@@ -2,46 +2,91 @@ import ReplayKit
 import CoreMedia
 import CoreImage
 import UIKit
+import Network
 
-class SampleHandler: RPBroadcastSampleHandler {
+@objc(SampleHandler)
+public class SampleHandler: RPBroadcastSampleHandler {
 
-    private let ciContext = CIContext(options: [
-        .useSoftwareRenderer: false, // GPU / Metal donanım hızlandırmasını kullan
-        .priorityRequestLow: false
-    ])
+    private lazy var ciContext: CIContext = {
+        CIContext(options: [
+            .useSoftwareRenderer: false,
+            .priorityRequestLow: false
+        ])
+    }()
     
-    // Akıllı TV tarayıcılarını yormamak ve stabil Full HD akış için saniyede 30 kare sınırı
     private var lastFrameTime: TimeInterval = 0
     private let frameInterval: TimeInterval = 1.0 / 30.0 
     
-    // Bellek tasarrufu için eşzamanlı video işleme kuyruğu
     private let processingQueue = DispatchQueue(label: "com.opencast.video.processing", qos: .userInteractive)
     private var isProcessingFrame = false
 
-    override func broadcastStarted(withSetupInfo setupInfo: [String : NSObject]?) {
-        print("[OpenCast] Ekran kaydı ve yayın başlatıldı.")
-        StreamServer.shared.start(onPort: 8080)
+    // Ana uygulamadaki StreamServer'a (127.0.0.1:8080) canlı kare aktaran yerel soket
+    private var localConnection: NWConnection?
+    private var isConnectedToMainApp = false
+
+    public override init() {
+        super.init()
     }
 
-    override func broadcastPaused() {
+    public override func broadcastStarted(withSetupInfo setupInfo: [String : NSObject]?) {
+        print("[OpenCast] Ekran kaydı ve yayın başladı.")
+        connectToMainAppServer()
+    }
+
+    public override func broadcastPaused() {
         print("[OpenCast] Yayın duraklatıldı.")
     }
 
-    override func broadcastResumed() {
+    public override func broadcastResumed() {
         print("[OpenCast] Yayın devam ettirildi.")
     }
 
-    override func broadcastFinished() {
+    public override func broadcastFinished() {
         print("[OpenCast] Ekran kaydı bitti.")
-        StreamServer.shared.stop()
+        localConnection?.cancel()
+        localConnection = nil
+        isConnectedToMainApp = false
     }
 
-    override func processSampleBuffer(_ sampleBuffer: CMSampleBuffer, with sampleBufferType: RPSampleBufferType) {
+    private func connectToMainAppServer() {
+        let endpoint = NWEndpoint.hostPort(
+            host: NWEndpoint.Host("127.0.0.1"),
+            port: NWEndpoint.Port(rawValue: 8080)!
+        )
+
+        let tcpOptions = NWProtocolTCP.Options()
+        tcpOptions.enableKeepalive = true
+        let params = NWParameters(tls: nil, tcp: tcpOptions)
+
+        localConnection = NWConnection(to: endpoint, using: params)
+        localConnection?.stateUpdateHandler = { [weak self] state in
+            switch state {
+            case .ready:
+                self?.isConnectedToMainApp = true
+                print("[OpenCast] Ana uygulamaya yerel olarak bağlandı.")
+                // El sıkışma isteği gönder
+                let handshake = "POST /push HTTP/1.1\r\nHost: 127.0.0.1:8080\r\n\r\n"
+                if let data = handshake.data(using: .utf8) {
+                    self?.localConnection?.send(content: data, completion: .contentProcessed { _ in })
+                }
+            case .failed(let err):
+                print("[OpenCast] Ana uygulamaya bağlanamadı: \(err)")
+                self?.isConnectedToMainApp = false
+            case .cancelled:
+                self?.isConnectedToMainApp = false
+            default:
+                break
+            }
+        }
+
+        localConnection?.start(queue: processingQueue)
+    }
+
+    public override func processSampleBuffer(_ sampleBuffer: CMSampleBuffer, with sampleBufferType: RPSampleBufferType) {
         switch sampleBufferType {
         case .video:
             handleVideoBuffer(sampleBuffer)
         case .audioApp, .audioMic:
-            // Gelecek aşamada ses aktarımı için genişletilebilir
             break
         @unknown default:
             break
@@ -51,9 +96,7 @@ class SampleHandler: RPBroadcastSampleHandler {
     private func handleVideoBuffer(_ sampleBuffer: CMSampleBuffer) {
         let currentTime = CACurrentMediaTime()
         guard currentTime - lastFrameTime >= frameInterval else { return }
-        
-        guard !isProcessingFrame else { return } // Önceki kare bitmediyse atla (Lag önleyici)
-        
+        guard !isProcessingFrame else { return }
         guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
         
         lastFrameTime = currentTime
@@ -64,17 +107,35 @@ class SampleHandler: RPBroadcastSampleHandler {
             guard let self = self else { return }
 
             let ciImage = CIImage(cvPixelBuffer: pixelBuffer)
-            
-            // Full HD 1080p kalitesinde ve düşük dosya boyutunda JPEG sıkıştırması (%72 kalite)
             guard let colorSpace = CGColorSpace(name: CGColorSpace.sRGB) else { return }
             
+            // Full HD kalitesinde (%70) GPU JPEG sıkıştırması
             if let jpegData = self.ciContext.jpegRepresentation(
                 of: ciImage,
                 colorSpace: colorSpace,
-                options: [CIImageRepresentationOption(rawValue: kCGImageDestinationLossyCompressionQuality as String): 0.72]
+                options: [CIImageRepresentationOption(rawValue: kCGImageDestinationLossyCompressionQuality as String): 0.70]
             ) {
-                StreamServer.shared.sendFrame(jpegData)
+                self.sendFrameToMainApp(jpegData)
             }
         }
+    }
+
+    private func sendFrameToMainApp(_ jpegData: Data) {
+        guard let connection = localConnection, isConnectedToMainApp else {
+            // Eğer bağlantı koptuysa yeniden bağlanmayı dene
+            connectToMainAppServer()
+            return
+        }
+
+        // [4 Bayt BigEndian Uzunluk] + [JPEG Verisi]
+        var length = UInt32(jpegData.count).bigEndian
+        var packet = Data(bytes: &length, count: 4)
+        packet.append(jpegData)
+
+        connection.send(content: packet, completion: .contentProcessed { error in
+            if error != nil {
+                print("[OpenCast] Kare gönderme hatası: \(String(describing: error))")
+            }
+        })
     }
 }

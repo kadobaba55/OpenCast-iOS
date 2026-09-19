@@ -102,7 +102,16 @@ public class StreamServer {
 
         let path = parts[1]
 
-        if path == "/stream" || path.starts(with: "/stream?") {
+        if path == "/push" {
+            // ReplayKit Extension'ından (SampleHandler) gelen canlı kareleri dinle
+            let ack = "HTTP/1.1 200 OK\r\nConnection: keep-alive\r\n\r\n"
+            if let ackData = ack.data(using: .utf8) {
+                connection.send(content: ackData, completion: .contentProcessed { [weak self] _ in
+                    self?.readFramesFromExtension(connection)
+                })
+            }
+        } else if path == "/stream" || path.starts(with: "/stream?") {
+            // TV ve Opera tarayıcısına canlı MJPEG yayını
             let header = "HTTP/1.1 200 OK\r\n" +
                          "Connection: close\r\n" +
                          "Server: OpenCast-Universal\r\n" +
@@ -115,6 +124,7 @@ public class StreamServer {
                 connection.send(content: headerData, completion: .contentProcessed { [weak self] err in
                     if err == nil {
                         self?.streamConnections.append(connection)
+                        print("[OpenCast] Yeni TV/Tarayıcı bağlandı. Toplam izleyici: \(self?.streamConnections.count ?? 0)")
                     } else {
                         self?.closeConnection(connection)
                     }
@@ -122,6 +132,37 @@ public class StreamServer {
             }
         } else {
             serveWebPlayer(on: connection)
+        }
+    }
+
+    /// Extension'dan gelen [4 bayt uzunluk][JPEG baytları] paketlerini okur
+    private func readFramesFromExtension(_ connection: NWConnection) {
+        // Önce 4 baytlık paket uzunluğunu oku
+        connection.receive(minimumIncompleteLength: 4, maximumLength: 4) { [weak self] lengthData, _, isComplete, error in
+            guard let self = self, error == nil, let lengthData = lengthData, lengthData.count == 4 else {
+                self?.closeConnection(connection)
+                return
+            }
+
+            let frameLength = Int(lengthData.withUnsafeBytes { $0.load(as: UInt32.self).bigEndian })
+            guard frameLength > 0 && frameLength < 10_000_000 else {
+                self.closeConnection(connection)
+                return
+            }
+
+            // Ardından tam olarak frameLength kadar JPEG verisini oku
+            connection.receive(minimumIncompleteLength: frameLength, maximumLength: frameLength) { [weak self] frameData, _, _, err in
+                guard let self = self, err == nil, let frameData = frameData else {
+                    self?.closeConnection(connection)
+                    return
+                }
+
+                // Gelen kareyi hemen TV'ye ve Opera'ya ilet!
+                self.sendFrame(frameData)
+
+                // Bir sonraki kare için dinlemeye devam et
+                self.readFramesFromExtension(connection)
+            }
         }
     }
 
