@@ -9,8 +9,9 @@ public struct NetworkUtils {
         guard getifaddrs(&ifaddr) == 0 else { return nil }
         guard let firstAddr = ifaddr else { return nil }
 
-        for ptr in sequence(first: firstAddr, by: { $0.pointee.ifa_next }) {
-            let interface = ptr.pointee
+        var ptr: UnsafeMutablePointer<ifaddrs>? = firstAddr
+        while let current = ptr {
+            let interface = current.pointee
             let addrFamily = interface.ifa_addr.pointee.sa_family
 
             // Sadece IPv4 adreslerini al (AF_INET)
@@ -32,6 +33,7 @@ public struct NetworkUtils {
                     break
                 }
             }
+            ptr = interface.ifa_next
         }
 
         freeifaddrs(ifaddr)

@@ -245,13 +245,15 @@ struct ContentView: View {
     }
 
     private func generateQRCode(from string: String) -> UIImage? {
-        let context = CIContext()
-        let filter = CIFilter.qrCodeGenerator()
-        filter.message = Data(string.utf8)
+        guard let data = string.data(using: .utf8) else { return nil }
+        guard let filter = CIFilter(name: "CIQRCodeGenerator") else { return nil }
+        filter.setValue(data, forKey: "inputMessage")
+        filter.setValue("M", forKey: "inputCorrectionLevel")
 
         if let outputImage = filter.outputImage {
             let transform = CGAffineTransform(scaleX: 8, y: 8)
             let scaledImage = outputImage.transformed(by: transform)
+            let context = CIContext()
             if let cgImage = context.createCGImage(scaledImage, from: scaledImage.extent) {
                 return UIImage(cgImage: cgImage)
             }
